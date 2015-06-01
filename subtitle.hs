@@ -3,6 +3,7 @@ import Data.Time.Format
 import Data.Time
 import System.Locale
 import Text.Printf
+import System.Environment
 
 data TimeStamp = TimeStamp Time Time
 	deriving Show
@@ -18,11 +19,8 @@ instance Show Time where
 instance Show SubtitleBlock where
 	show (SubtitleBlock n (TimeStamp begin end) lines) = (show n) ++ "\n" ++ (show begin) ++ " --> " ++ (show end) ++ "\n" ++ (foldr (\x y -> x ++ "\n" ++ y) "" lines)
 
-addDelayTimestamp :: TimeStamp -> Integer -> TimeStamp
-addDelayTimestamp (TimeStamp x y) d = TimeStamp x y
-
-addDelayTime :: Time -> Integer -> Time
-addDelayTime (Time h m s ms) d = 
+addDelayTime :: Integer -> Time -> Time
+addDelayTime d (Time h m s ms) = 
 		let x = d + ms + (s*1000) + (m*60000) + (h*3600000)
 		    millis = mod x 1000
 		    secs = mod (quot x 1000) 60
@@ -30,6 +28,12 @@ addDelayTime (Time h m s ms) d =
 		    hours = (quot x 3600000)
 		in
 		    Time hours mins secs millis
+
+addDelaySubtitleBlock :: Integer -> SubtitleBlock -> SubtitleBlock
+addDelaySubtitleBlock d (SubtitleBlock x y z) = SubtitleBlock x (addDelayTimeStamp d y) z
+
+addDelayTimeStamp :: Integer -> TimeStamp -> TimeStamp
+addDelayTimeStamp d (TimeStamp b e) = TimeStamp (addDelayTime d b) (addDelayTime d e)
 
 parseId :: GenParser Char st Int
 parseId =
@@ -82,6 +86,9 @@ parseSubtitles =
 	do b <- many parseSubtitleBlock
 	   return b
 
+addDelaySubtitles :: Integer -> [SubtitleBlock] -> [SubtitleBlock]
+addDelaySubtitles d s = map (addDelaySubtitleBlock d) s
+
 eol =   try (string "\n\r")
         <|> try (string "\r\n")
         <|> string "\n"
@@ -89,7 +96,8 @@ eol =   try (string "\n\r")
 
 main =
     do c <- getContents
+       args <- getArgs
        case parse parseSubtitles "(stdin)" c of
          Left e -> do putStrLn "Error parsing input:"
 		      print e
-	 Right r -> mapM_ print r
+	 Right r -> mapM_ print (map (addDelaySubtitleBlock (read (head args) :: Integer)) r)
