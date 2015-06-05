@@ -5,10 +5,35 @@ import System.Locale
 import Text.Printf
 import System.Environment
 
+type Hour = Integer
+type Minute = Integer
+type Second = Integer
+type Millisecond = Integer
+
 data TimeStamp = TimeStamp Time Time
 	deriving Show
 
 data Time = Time Integer Integer Integer Integer
+
+
+-- smart time constructor
+time :: Hour -> Minute -> Second -> Millisecond -> Time
+time h m s ms = normalizeTime (Time h m s ms)
+
+-- makes sure overflow is handled well
+normalizeTime :: Time -> Time
+normalizeTime (Time h m s ms) =
+		let x = ms + (s*1000) + (m*60000) + (h*3600000)
+		    millis = mod x 1000
+		    secs = mod (quot x 1000) 60
+		    mins = mod (quot x 60000) 60
+		    hours = (quot x 3600000)
+		in
+		    Time hours mins secs millis
+
+-- add times
+addTime :: Time -> Time -> Time
+addTime (Time h1 m1 s1 ms1) (Time h2 m2 s2 ms2) = time (h1 + h2) (m1 + m2) (s1 + s2) (ms1 + ms2)
 
 data SubtitleBlock = SubtitleBlock Int TimeStamp [String]
 
@@ -20,14 +45,7 @@ instance Show SubtitleBlock where
 	show (SubtitleBlock n (TimeStamp begin end) lines) = (show n) ++ "\n" ++ (show begin) ++ " --> " ++ (show end) ++ "\n" ++ (foldr (\x y -> x ++ "\n" ++ y) "" lines)
 
 addDelayTime :: Integer -> Time -> Time
-addDelayTime d (Time h m s ms) = 
-		let x = d + ms + (s*1000) + (m*60000) + (h*3600000)
-		    millis = mod x 1000
-		    secs = mod (quot x 1000) 60
-		    mins = mod (quot x 60000) 60
-		    hours = (quot x 3600000)
-		in
-		    Time hours mins secs millis
+addDelayTime a b = addTime (time 0 0 0 a) b
 
 addDelaySubtitleBlock :: Integer -> SubtitleBlock -> SubtitleBlock
 addDelaySubtitleBlock d (SubtitleBlock x y z) = SubtitleBlock x (addDelayTimeStamp d y) z
